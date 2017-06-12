@@ -31,3 +31,9 @@ vignettes/*.pdf
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
+
+# Junk files created by a Mac
+._*
+
+# Rsconnect folder
+/rsconnect/
