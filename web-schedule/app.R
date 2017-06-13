@@ -2,14 +2,9 @@
 # UWRF Web Reporting
 #
 
-# Deploy this app individually:
-# setwd("D:/Dropbox/projects/r-projects (not git)/shiny/web-schedule")
-# rsconnect::deployApp()
-
 library(shiny)
 library(rvest)
 library(magrittr)
-library(reticulate)
 library(stringr)
 library(openxlsx)
 
@@ -83,9 +78,10 @@ toRender <- function(term, subject, result = "master"){
   courses <- master[, c(1, 7)]
   courses[, 1] <- as.numeric(courses[, 1])
   courses[, 2] <- as.numeric(str_extract(courses[, 2], "[0-9]*"))
-  names(courses) <- c("c", "e")
-  courses <- aggregate(courses$e, by = list(Category = courses$c), FUN = sum)
-  names(courses) <- c("Catalog Number", "Enrolled")
+  courses[, 3] <- rep(1, nrow(courses))
+  names(courses) <- c("c", "e", "n")
+  courses <- aggregate(cbind(courses$n, courses$e), by = list(Category = courses$c), FUN = sum)
+  names(courses) <- c("Catalog Number", "Sections", "Enrolled")
   
   if (result == "courses") return(courses)
   else return(master)
