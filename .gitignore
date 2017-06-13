@@ -36,4 +36,4 @@ vignettes/*.pdf
 ._*
 
 # Rsconnect folder
-/rsconnect/
+/web-schedule/rsconnect/
