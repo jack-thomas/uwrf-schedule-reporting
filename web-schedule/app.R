@@ -55,33 +55,39 @@ toRender <- function(term, subject, result = "master"){
     .[[1]] %>%
     gsub("<(.*?)>", "", .) %>%
     str_trim()
-  master <- data.frame(matrix(0, nrow = length(which(results == "Section")), ncol = 8))
-  names(master) <- c("CatalogNumber", "Title", "Credits", "Section", "ClassNumber", "Instructor", "Enrolled", "Room")
+  master <- data.frame(matrix(0, nrow = length(which(results == "Section")), ncol = 9))
+  names(master) <- c("CatalogNumber", "Title", "Credits", "Section", "ClassNumber", "Instructor", "Enrolled", "Room", "Time")
   master$Section <- which(results == "Section")
   master$CatalogNumber <- (which(results == "Catalog Number"))[findInterval(master$Section, which(results == "Catalog Number"))]
   master$Instructor <- (which(results == "Instructor"))[findInterval(master$Section, which(results == "Instructor")) + 1]
   master$Enrolled <- (which(results == "Enrolled"))[findInterval(master$Section, which(results == "Enrolled")) + 1]
   master$Room <- (which(results == "Room"))[findInterval(master$Section, which(results == "Room")) + 1]
   master$ClassNumber <- (which(results == "Class Number"))[findInterval(master$Section, which(results == "Class Number")) + 1]
-  which(results == "Room") + 1
+  master$Time <- (which(results == "Time"))[findInterval(master$Section, which(results == "Time")) + 1]
   master$Section <- results[master$Section + 1]
   master$Title <- results[master$CatalogNumber + 6]
+  master$Title <- gsub("&amp;", "&", master$Title)
   master$Credits <- results[master$CatalogNumber + 7]
   master$CatalogNumber <- results[master$CatalogNumber + 4]
   master$Instructor <- results[master$Instructor + 1]
   master$Instructor <- gsub(",", ", ", master$Instructor)
   master$Enrolled <- results[master$Enrolled + 1]
   master$Room <- results[master$Room + 1]
+  master$Time <- results[master$Time + 1]
   master$ClassNumber <- results[master$ClassNumber + 1]
-  names(master) <- c("Catalog Number", "Title", "Credits", "Section", "Class Number", "Instructor", "Enrolled", "Room")
-  
+  names(master) <- c("Catalog Number", "Course Title", "Credits", "Section Number",
+                     "Class Number", "Instructor", "Enrollment", "Room(s)", "Days and Times")
+  # Get summary data before moving around columns...
   courses <- master[, c(1, 7)]
+  # Requested order: Cat Num, Sec, Title, Cred, Times, Enroll, Room, Instr, Cl Num
+  master <- master[, c(1, 4, 2, 3, 9, 7, 8, 6, 5)]
+  # Continue computing summary
   courses[, 1] <- as.numeric(courses[, 1])
   courses[, 2] <- as.numeric(str_extract(courses[, 2], "[0-9]*"))
   courses[, 3] <- rep(1, nrow(courses))
   names(courses) <- c("c", "e", "n")
   courses <- aggregate(cbind(courses$n, courses$e), by = list(Category = courses$c), FUN = sum)
-  names(courses) <- c("Catalog Number", "Sections", "Enrolled")
+  names(courses) <- c("Catalog Number", "Sections", "Enrollment")
   
   if (result == "courses") return(courses)
   else return(master)
@@ -137,7 +143,10 @@ esisTable <- function(longText){
     as.numeric()
   a$Name <- gsub("MATH [0-9]* - ", "", a$Name) %>%
     substr(., 1, (nchar(.) - 1) / 2)
-  return(a[, c(3:ncol(a))])
+  a <- a[, c(4, 6, 5, 7, 8, 9, 3)]
+  names(a) <- c("Catalog Number", "Section Number", "Course Title", "Days and Times",
+                "Room(s)", "Instructor", "Class Number")
+  return(a)
 }
 
 uwrf_ui <- fluidPage(
