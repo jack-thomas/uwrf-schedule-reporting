@@ -61,7 +61,12 @@ toRender <- function(term, subject, result = "master"){
   master$CatalogNumber <- (which(results == "Catalog Number"))[findInterval(master$Section, which(results == "Catalog Number"))]
   master$Instructor <- (which(results == "Instructor"))[findInterval(master$Section, which(results == "Instructor")) + 1]
   master$Enrolled <- (which(results == "Enrolled"))[findInterval(master$Section, which(results == "Enrolled")) + 1]
-  master$Room <- (which(results == "Room"))[findInterval(master$Section, which(results == "Room")) + 1]
+  room1 <- results[(which(results == "Room")) + 1]
+  room2 <- findInterval(master$Section, which(results == "Room")) + 1
+  room3 <- data.frame(room2[findInterval(c(1:length(room1)), room2)], room1)
+  names(room3) <- c("x1", "x2")
+  room4 <- aggregate(room3, by = list(room3$x1), FUN = toString)[,3]
+  master$Room <- room4
   master$ClassNumber <- (which(results == "Class Number"))[findInterval(master$Section, which(results == "Class Number")) + 1]
   time1 <- results[(which(results == "Time")) + 1]
   time2 <- findInterval(master$Section, which(results == "Time")) + 1
@@ -77,7 +82,6 @@ toRender <- function(term, subject, result = "master"){
   master$Instructor <- results[master$Instructor + 1]
   master$Instructor <- gsub(",", ", ", master$Instructor)
   master$Enrolled <- results[master$Enrolled + 1]
-  master$Room <- results[master$Room + 1]
   master$ClassNumber <- results[master$ClassNumber + 1]
   names(master) <- c("Catalog Number", "Course Title", "Credits", "Section Number",
                      "Class Number", "Instructor", "Enrollment", "Room(s)", "Days and Times")
