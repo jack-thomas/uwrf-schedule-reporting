@@ -63,7 +63,12 @@ toRender <- function(term, subject, result = "master"){
   master$Enrolled <- (which(results == "Enrolled"))[findInterval(master$Section, which(results == "Enrolled")) + 1]
   master$Room <- (which(results == "Room"))[findInterval(master$Section, which(results == "Room")) + 1]
   master$ClassNumber <- (which(results == "Class Number"))[findInterval(master$Section, which(results == "Class Number")) + 1]
-  master$Time <- (which(results == "Time"))[findInterval(master$Section, which(results == "Time")) + 1]
+  time1 <- results[(which(results == "Time")) + 1]
+  time2 <- findInterval(master$Section, which(results == "Time")) + 1
+  time3 <- data.frame(time2[findInterval(c(1:length(time1)), time2)], time1)
+  names(time3) <- c("x1", "x2")
+  time4 <- aggregate(time3, by = list(time3$x1), FUN = toString)[,3]
+  master$Time <- time4
   master$Section <- results[master$Section + 1]
   master$Title <- results[master$CatalogNumber + 6]
   master$Title <- gsub("&amp;", "&", master$Title)
@@ -73,7 +78,6 @@ toRender <- function(term, subject, result = "master"){
   master$Instructor <- gsub(",", ", ", master$Instructor)
   master$Enrolled <- results[master$Enrolled + 1]
   master$Room <- results[master$Room + 1]
-  master$Time <- results[master$Time + 1]
   master$ClassNumber <- results[master$ClassNumber + 1]
   names(master) <- c("Catalog Number", "Course Title", "Credits", "Section Number",
                      "Class Number", "Instructor", "Enrollment", "Room(s)", "Days and Times")
