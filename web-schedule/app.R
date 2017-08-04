@@ -65,15 +65,24 @@ toRender <- function(term, subject, result = "master"){
   room2 <- findInterval(master$Section, which(results == "Room")) + 1
   room3 <- data.frame(room2[findInterval(c(1:length(room1)), room2)], room1)
   names(room3) <- c("x1", "x2")
-  room4 <- aggregate(room3, by = list(room3$x1), FUN = toString)[,3]
-  master$Room <- room4
+  room4 <- aggregate(room3, by = list(room3$x1), FUN = toString)[,3] %>%
+    str_split(., ",") %>%
+    gsub("c\\(", "", .) %>%
+    gsub("\"", "", .) %>%
+    gsub(")", "", .) %>%
+    gsub("  ", "", .) %>%
+    str_split(., ",")
+  compare <- function(v) all(sapply( as.list(v[-1]), FUN=function(z) {identical(z, v[1])}))
+  first <- function(a) {a[1]}
+  jPaste <- function(a) {toString(a) %>% gsub(",", ";", .)}
+  master$Room <- ifelse(sapply(room4, compare), sapply(room4, first), sapply(room4, jPaste))
   master$ClassNumber <- (which(results == "Class Number"))[findInterval(master$Section, which(results == "Class Number")) + 1]
   time1 <- results[(which(results == "Time")) + 1]
   time2 <- findInterval(master$Section, which(results == "Time")) + 1
   time3 <- data.frame(time2[findInterval(c(1:length(time1)), time2)], time1)
   names(time3) <- c("x1", "x2")
   time4 <- aggregate(time3, by = list(time3$x1), FUN = toString)[,3]
-  master$Time <- time4
+  master$Time <- gsub(",", ";", time4)
   master$Section <- results[master$Section + 1]
   master$Title <- results[master$CatalogNumber + 6]
   master$Title <- gsub("&amp;", "&", master$Title)
