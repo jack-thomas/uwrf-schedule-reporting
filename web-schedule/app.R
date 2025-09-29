@@ -3,111 +3,90 @@
 #
 
 library(shiny)
-library(rvest)
+library(dplyr)
+library(httr2)
+library(jsonlite)
 library(magrittr)
 library(stringr)
 library(openxlsx)
 
-# PRE-PROCESSING
-## SETUP TERM INPUT
-terms <- read_html("https://www.uwrf.edu/ClassSchedule/") %>%
-  html_nodes(., xpath = '//*[(@id = "selectTerm")]') %>%
-  html_children() %>%
-  html_attr(., "value")
-term_names <- read_html("https://www.uwrf.edu/ClassSchedule/") %>%
-  html_nodes(., xpath = '//*[(@id = "selectTerm")]') %>%
-  html_text(.) %>%
-  gsub("\\\r", "", .) %>%
-  gsub("\\\n", "", .) %>%
-  gsub("\\\t+", ",", .) %>%
-  strsplit(., ",")
-term_names <- term_names[[1]]
-names(terms) <- term_names
-
-## SETUP SUBJECT INPUT
-subjects <- read_html("https://www.uwrf.edu/ClassSchedule/") %>%
-  html_nodes(., xpath = '//*[(@id = "selectSubject")]') %>%
-  html_children() %>%
-  html_attr(., "value")
-subject_names <- read_html("https://www.uwrf.edu/ClassSchedule/") %>%
-  html_nodes(., xpath = '//*[(@id = "selectSubject")]') %>%
-  html_text(.) %>%
-  gsub(",", "", .) %>%
-  gsub("\\\r\\\n\\\t\\\t\\\t\\\t\\\t\\\t\\\t\\\t\\\t\\\t\\\t", ",", .) %>%
-  gsub("\\\r\\\n\\\t\\\t\\\t\\\t\\\t\\\t\\\t\\\t\\\t\\\t", "", .) %>%
-  strsplit(., ",")
-subject_names <- subject_names[[1]]
-names(subjects) <- subject_names
-
 ## GET WEB RESULTS
-toRender <- function(term, subject, result = "master"){
-  # The result input is backwards... ``result = "courses"`` returns a summary.
-  session1 <- html_session("https://www.uwrf.edu/ClassSchedule/")
-  form1 <- html_form(read_html(session1))[[3]]
-  results <- submit_form(session1, set_values(form1, courseTerm = term, courseSubject = subject, instructor = "")) %>%
-    read_html() %>%
-    html_nodes(., xpath = '//*[(@id = "courseTable")]') %>%
-    as.character() %>%
-    gsub("[\\\r\\\n\\\t]*", '', .) %>%
-    gsub('\\\"', '', .) %>%
-    gsub("\\s+", " ", .) %>%
-    str_extract_all(., "<td(.*?)</td>") %>%
-    .[[1]] %>%
-    gsub("<(.*?)>", "", .) %>%
-    str_trim()
-  master <- data.frame(matrix(0, nrow = length(which(results == "Section")), ncol = 9))
-  names(master) <- c("CatalogNumber", "Title", "Credits", "Section", "ClassNumber", "Instructor", "Enrolled", "Room", "Time")
-  master$Section <- which(results == "Section")
-  master$CatalogNumber <- (which(results == "Catalog Number"))[findInterval(master$Section, which(results == "Catalog Number"))]
-  master$Instructor <- (which(results == "Instructor"))[findInterval(master$Section, which(results == "Instructor")) + 1]
-  master$Enrolled <- (which(results == "Enrolled"))[findInterval(master$Section, which(results == "Enrolled")) + 1]
-  room1 <- results[(which(results == "Room")) + 1]
-  room2 <- findInterval(master$Section, which(results == "Room")) + 1
-  room3 <- data.frame(room2[findInterval(c(1:length(room1)), room2)], room1)
-  names(room3) <- c("x1", "x2")
-  room4 <- aggregate(room3, by = list(room3$x1), FUN = toString)[,3] %>%
-    str_split(., ",") %>%
-    gsub("c\\(", "", .) %>%
-    gsub("\"", "", .) %>%
-    gsub(")", "", .) %>%
-    gsub("  ", "", .) %>%
-    str_split(., ",")
-  compare <- function(v) all(sapply( as.list(v[-1]), FUN=function(z) {identical(z, v[1])}))
-  first <- function(a) {a[1]}
-  jPaste <- function(a) {toString(a) %>% gsub(",", ";", .)}
-  master$Room <- ifelse(sapply(room4, compare), sapply(room4, first), sapply(room4, jPaste))
-  master$ClassNumber <- (which(results == "Class Number"))[findInterval(master$Section, which(results == "Class Number")) + 1]
-  time1 <- results[(which(results == "Time")) + 1]
-  time2 <- findInterval(master$Section, which(results == "Time")) + 1
-  time3 <- data.frame(time2[findInterval(c(1:length(time1)), time2)], time1)
-  names(time3) <- c("x1", "x2")
-  time4 <- aggregate(time3, by = list(time3$x1), FUN = toString)[,3]
-  master$Time <- gsub(",", ";", time4)
-  master$Section <- results[master$Section + 1]
-  master$Title <- results[master$CatalogNumber + 6]
-  master$Title <- gsub("&amp;", "&", master$Title)
-  master$Credits <- results[master$CatalogNumber + 7]
-  master$CatalogNumber <- results[master$CatalogNumber + 4]
-  master$Instructor <- results[master$Instructor + 1]
-  master$Instructor <- gsub(",", ", ", master$Instructor)
-  master$Enrolled <- results[master$Enrolled + 1]
-  master$ClassNumber <- results[master$ClassNumber + 1]
-  names(master) <- c("Catalog Number", "Course Title", "Credits", "Section Number",
-                     "Class Number", "Instructor", "Enrollment", "Room(s)", "Days and Times")
-  # Get summary data before moving around columns...
-  courses <- master[, c(1, 7)]
-  # Requested order: Cat Num, Sec, Title, Cred, Times, Enroll, Room, Instr, Cl Num
-  master <- master[, c(1, 4, 2, 3, 9, 7, 8, 6, 5)]
-  # Continue computing summary
-  courses[, 1] <- as.numeric(courses[, 1])
-  courses[, 2] <- as.numeric(str_extract(courses[, 2], "[0-9]*"))
-  courses[, 3] <- rep(1, nrow(courses))
-  names(courses) <- c("c", "e", "n")
-  courses <- aggregate(cbind(courses$n, courses$e), by = list(Category = courses$c), FUN = sum)
-  names(courses) <- c("Catalog Number", "Sections", "Enrollment")
-  
-  if (result == "courses") return(courses)
-  else return(master)
+getData <- function(query, base_url = "https://students.uwrf.edu/custom/schedulelookup/") {
+  resp <- request(base_url) %>%
+    req_url_query(!!!query) %>%
+    req_headers(Accept = "application/json", Referer = base_url) %>%
+    req_perform() %>%
+    resp_body_string() %>%
+    fromJSON() %>%
+    return()
+}
+## get background / supporting data
+terms_data <- getData(query = list(f = "terms"))
+terms <- terms_data$termId
+names(terms) <- terms_data$termDesc
+subjects_data <- getData(query = list(f = "subjects"))
+subjects <- subjects_data$subjectId
+names(subjects) <- subjects_data$subjectDesc
+## get classes
+toRender <- function(term, subject, result = "Courses") {
+  # result can either be "Courses" (the default) or "Summary" (the second tab)
+  result_df <- getData(query = list(courseTerm = term, courseSubject = subject))
+  if (is.null(nrow(result_df))) {
+    return(data.frame())
+  }
+  result_df %<>%
+    mutate(
+      time_mutated = ifelse(
+        or(is.na(timeStart), is.na(timeEnd)),
+        NA,
+        gsub("\\s+", " ", str_trim(paste(
+          paste(timeStart, timeEnd, sep = " - "),
+          ifelse(and(!is.na(monday), monday == "Y"), "M", ""),
+          ifelse(and(!is.na(tuesday), tuesday == "Y"), "Tu", ""),
+          ifelse(and(!is.na(wednesday), wednesday == "Y"), "W", ""),
+          ifelse(and(!is.na(thursday), thursday == "Y"), "Th", ""),
+          ifelse(and(!is.na(friday), friday == "Y"), "F", ""),
+          ifelse(and(!is.na(saturday), saturday == "Y"), "Sa", ""),
+          ifelse(and(!is.na(sunday), sunday == "Y"), "Su", ""),
+          sep = " "
+        )))
+      )
+    ) %>%
+    mutate(
+      instructor_mutated = str_replace(instructor, ",", ", ")
+    ) %>%
+    select(
+      `Catalog Number` = catalogNumber,
+      `Course Title` = description,
+      Credits = unitsMax,
+      `Section Number` = section,
+      `Class Number` = classNumber,
+      Instructor = instructor_mutated,
+      Enrollment = enrollTotal, #TODO consider adding x of y instead of just x
+      `Room(s)` = location,
+      `Time(s)` = time_mutated
+    ) %>%
+    group_by(`Catalog Number`, `Course Title`, Credits, `Section Number`, `Class Number`) %>%
+    summarize(
+      `Instructor(s)` = paste(unique(Instructor), collapse = "; "),
+      Enrollment = mean(Enrollment),
+      `Room(s)` = paste(unique(`Room(s)`), collapse = "; "),
+      `Time(s)` = gsub("^$", NA, paste(unique(na.omit(`Time(s)`)), collapse = "; ")),
+      .groups = "rowwise"
+    ) %>%
+    arrange(
+      readr::parse_number(`Catalog Number`),
+      readr::parse_number(`Section Number`)
+    )
+  if (result == "Summary") {
+    result_df %<>%
+      group_by(`Catalog Number`) %>%
+      summarize(
+        Sections = n_distinct(`Section Number`),
+        Enrollment = sum(Enrollment)
+      )
+  }
+  return(result_df)
 }
 
 ## GET ESIS RESULTS
@@ -180,7 +159,7 @@ uwrf_ui <- fluidPage(
         ),
         conditionalPanel(
           condition = "input.esisTerm != ''",
-          downloadButton("esisDownload")
+          downloadButton(outputId = "esisDownload")
         )
       ),
       conditionalPanel(
@@ -212,29 +191,35 @@ uwrf_server <- function(input, output) {
   output$esisNoTerm <- renderText("Please provide a term to download.")
   output$esisTable <- renderTable(esisTable(input$pasted), digits = 0)
   output$esisDownload <- downloadHandler(
-    filename = function() {return(paste("eSIS ", input$esisTerm, ".xlsx", sep = ''))},
-    content = function(file) {xlsx::write.xlsx(esisTable(input$pasted),
-                                               sheetName = "Courses",
-                                               file, row.names = FALSE)}
+    filename = function() {return(paste(input$esisTerm, " eSIS Schedule Report.xlsx", sep = ''))},
+    content = function(file) {
+      xlsx::write.xlsx2(esisTable(input$pasted), sheetName = "Courses", file, row.names = FALSE)
+    }
   )
-  
+
   # WEB
   output$webTable <- renderTable(toRender(input$TermInput, input$SubjInput), digits = 0)
-  output$webTableSummary <- renderTable(toRender(input$TermInput, input$SubjInput, result = "courses"), digits = 0)
+  output$webTableSummary <- renderTable(toRender(input$TermInput, input$SubjInput, "Summary"), digits = 0)
   output$webDownload <- downloadHandler(
     filename = function() {
       return(
-        paste(ifelse(input$TermInput == "", "All", term_names[which(terms == input$TermInput)]),
-              ' Web.xlsx', sep = '')
+        paste(
+          ifelse(input$TermInput == "", "All", terms_data$termDesc[which(terms == input$TermInput)]),
+          ' Web Schedule Report.xlsx',
+          sep = ''
+        )
       )
     },
     content = function(file) {
-      xlsx::write.xlsx(toRender(input$TermInput, input$SubjInput),
-                       sheetName = "Courses",
-                       file, row.names = FALSE)
-      xlsx::write.xlsx(toRender(input$TermInput, input$SubjInput, result = "courses"),
-                       sheetName = "Summary",
-                       file, row.names = FALSE, append = TRUE)
+      xlsx::write.xlsx2(
+        as.data.frame(toRender(input$TermInput, input$SubjInput, "Courses")),
+        sheetName = "Courses", file, row.names = FALSE
+      )
+      xlsx::write.xlsx2(
+        as.data.frame(toRender(input$TermInput, input$SubjInput, "Summary")),
+        sheetName = "Summary", file, row.names = FALSE,
+        append = TRUE
+      )
     }
   )
 }
