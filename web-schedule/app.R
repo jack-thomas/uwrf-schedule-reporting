@@ -84,7 +84,8 @@ toRender <- function(term, subject, result = "Courses") {
       summarize(
         Sections = n_distinct(`Section Number`),
         Enrollment = sum(Enrollment)
-      )
+      ) %>%
+      arrange(readr::parse_number(`Catalog Number`))
   }
   return(result_df)
 }
