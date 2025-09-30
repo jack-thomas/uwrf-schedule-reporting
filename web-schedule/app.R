@@ -44,7 +44,7 @@ toRender <- function(term, subject, result = "Courses") {
   if (is.null(nrow(result_df))) {
     return(data.frame())
   }
-  result_df %<>%
+  courses_df <- result_df %>%
     mutate(
       time_mutated = ifelse(
         or(is.na(timeStart), is.na(timeEnd)),
@@ -63,7 +63,8 @@ toRender <- function(term, subject, result = "Courses") {
       )
     ) %>%
     mutate(
-      instructor_mutated = str_replace(instructor, ",", ", ")
+      instructor_mutated = str_replace(instructor, ",", ", "),
+      enrollment_mutated = paste(enrollTotal, enrollMax, sep = " of ")
     ) %>%
     select(
       `Catalog Number` = catalogNumber,
@@ -72,14 +73,13 @@ toRender <- function(term, subject, result = "Courses") {
       `Section Number` = section,
       `Class Number` = classNumber,
       Instructor = instructor_mutated,
-      Enrollment = enrollTotal, #TODO consider adding x of y instead of just x
+      Enrollment = enrollment_mutated,
       `Room(s)` = location,
       `Time(s)` = time_mutated
     ) %>%
-    group_by(`Catalog Number`, `Course Title`, Credits, `Section Number`, `Class Number`) %>%
+    group_by(`Catalog Number`, `Course Title`, Credits, `Section Number`, `Class Number`, Enrollment) %>%
     summarize(
       `Instructor(s)` = paste(unique(Instructor), collapse = "; "),
-      Enrollment = mean(Enrollment),
       `Room(s)` = paste(unique(`Room(s)`), collapse = "; "),
       `Time(s)` = gsub("^$", NA, paste(unique(na.omit(`Time(s)`)), collapse = "; ")),
       .groups = "rowwise"
@@ -89,15 +89,22 @@ toRender <- function(term, subject, result = "Courses") {
       readr::parse_number(`Section Number`)
     )
   if (result == "Summary") {
-    result_df %<>%
+    result_df %>%
+      select(`Catalog Number` = catalogNumber, section, enrollTotal, enrollMax) %>%
+      distinct(`Catalog Number`, section, .keep_all = TRUE) %>%
       group_by(`Catalog Number`) %>%
       summarize(
-        Sections = n_distinct(`Section Number`),
-        Enrollment = sum(Enrollment)
+        Sections = n_distinct(section),
+        enrollTotal = sum(enrollTotal),
+        enrollMax = sum(enrollMax)
       ) %>%
-      arrange(readr::parse_number(`Catalog Number`))
+      mutate(Enrollment = paste(enrollTotal, enrollMax, sep = " of ")) %>%
+      select(`Catalog Number`, Sections, Enrollment) %>%
+      arrange(readr::parse_number(`Catalog Number`)) %>%
+      return()
+  } else {
+    return(courses_df)
   }
-  return(result_df)
 }
 
 ####################################################################################################
