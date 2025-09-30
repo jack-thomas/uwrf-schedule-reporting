@@ -2,6 +2,15 @@
 # UWRF Web Reporting
 #
 
+####################################################################################################
+#NOTE - This is pulling data from UWRF's schedule lookup tool, which is available here:
+#       https://students.uwrf.edu/catalog/schedule-lookup
+#     - That page imports a Javascript script, which (thankfully and surprisingly) is available
+#       non-minified here:
+#       view-source:https://www.uwrf.edu/CDN/students/js/rf-schedule-lookup.js
+
+####################################################################################################
+# import libraries
 library(shiny)
 library(dplyr)
 library(httr2)
@@ -10,7 +19,8 @@ library(magrittr)
 library(stringr)
 library(openxlsx)
 
-## GET WEB RESULTS
+####################################################################################################
+# web results
 getData <- function(query, base_url = "https://students.uwrf.edu/custom/schedulelookup/") {
   resp <- request(base_url) %>%
     req_url_query(!!!query) %>%
@@ -90,7 +100,8 @@ toRender <- function(term, subject, result = "Courses") {
   return(result_df)
 }
 
-## GET ESIS RESULTS
+####################################################################################################
+# esis results
 esisTable <- function(longText){
   allitems <- str_split(longText, "\n")
   allitems <- allitems[[1]]
@@ -146,6 +157,8 @@ esisTable <- function(longText){
   return(a)
 }
 
+####################################################################################################
+# ui
 uwrf_ui <- fluidPage(
   titlePanel("UWRF Web Schedule Reporting"),
   sidebarLayout(
@@ -187,6 +200,8 @@ uwrf_ui <- fluidPage(
   )
 )
 
+####################################################################################################
+# server
 uwrf_server <- function(input, output) {
   #ESIS
   output$esisNoTerm <- renderText("Please provide a term to download.")
@@ -225,4 +240,6 @@ uwrf_server <- function(input, output) {
   )
 }
 
+####################################################################################################
+# run app
 shinyApp(uwrf_ui, uwrf_server)
