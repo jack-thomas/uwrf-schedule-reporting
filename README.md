@@ -1,4 +1,4 @@
-# [UWRF Schedule Reporting](https://jackthomas.shinyapps.io/web-schedule/)
+# [UWRF Schedule Reporting](https://jackthomas-web-schedule.share.connect.posit.cloud/)
 
 This is the UWRF Schedule Reporting Shiny app that I built for Dr. Tomlinson at the University of Wisconsin-River Falls.
 
