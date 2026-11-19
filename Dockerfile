@@ -1,4 +1,4 @@
-FROM rocker/r-ver/4.6.2
+FROM rocker/r-ver:4.6.2
 
 # system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
