@@ -235,15 +235,12 @@ uwrf_server <- function(input, output) {
       )
     },
     content = function(file) {
-      write.xlsx(
-        as.data.frame(toRender(input$TermInput, input$SubjInput, "Courses")),
-        sheetName = "Courses", file, rowNames = FALSE
-      )
-      write.xlsx(
-        as.data.frame(toRender(input$TermInput, input$SubjInput, "Summary")),
-        sheetName = "Summary", file, rowNames = FALSE,
-        append = TRUE
-      )
+      wb <- createWorkbook()
+      addWorksheet(wb, "Courses")
+      writeData(wb, "Courses", as.data.frame(toRender(input$TermInput, input$SubjInput, "Courses")))
+      addWorksheet(wb, "Summary")
+      writeData(wb, "Summary", as.data.frame(toRender(input$TermInput, input$SubjInput, "Summary")))
+      saveWorkbook(wb, file)
     }
   )
 }
