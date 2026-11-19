@@ -12,6 +12,7 @@
 ####################################################################################################
 # import libraries
 library(shiny)
+library(readr)
 library(dplyr)
 library(httr2)
 library(jsonlite)
@@ -85,8 +86,8 @@ toRender <- function(term, subject, result = "Courses") {
       .groups = "rowwise"
     ) %>%
     arrange(
-      readr::parse_number(`Catalog Number`),
-      readr::parse_number(`Section Number`)
+      parse_number(`Catalog Number`),
+      parse_number(`Section Number`)
     )
   if (result == "Summary") {
     result_df %>%
@@ -100,7 +101,7 @@ toRender <- function(term, subject, result = "Courses") {
       ) %>%
       mutate(Enrollment = paste(enrollTotal, enrollMax, sep = " of ")) %>%
       select(`Catalog Number`, Sections, Enrollment) %>%
-      arrange(readr::parse_number(`Catalog Number`)) %>%
+      arrange(parse_number(`Catalog Number`)) %>%
       return()
   } else {
     return(courses_df)
@@ -216,7 +217,7 @@ uwrf_server <- function(input, output) {
   output$esisDownload <- downloadHandler(
     filename = function() {return(paste(input$esisTerm, " eSIS Schedule Report.xlsx", sep = ''))},
     content = function(file) {
-      xlsx::write.xlsx2(esisTable(input$pasted), sheetName = "Courses", file, row.names = FALSE)
+      write.xlsx(esisTable(input$pasted), sheetName = "Courses", file, rowNames = FALSE)
     }
   )
 
@@ -234,13 +235,13 @@ uwrf_server <- function(input, output) {
       )
     },
     content = function(file) {
-      xlsx::write.xlsx2(
+      write.xlsx(
         as.data.frame(toRender(input$TermInput, input$SubjInput, "Courses")),
-        sheetName = "Courses", file, row.names = FALSE
+        sheetName = "Courses", file, rowNames = FALSE
       )
-      xlsx::write.xlsx2(
+      write.xlsx(
         as.data.frame(toRender(input$TermInput, input$SubjInput, "Summary")),
-        sheetName = "Summary", file, row.names = FALSE,
+        sheetName = "Summary", file, rowNames = FALSE,
         append = TRUE
       )
     }
